@@ -139,16 +139,14 @@ jobs:
     needs: lint
     # continue even if this job fails so Pages still gets published
     continue-on-error: true
-    # Hard cap: Ollama on a free runner is slow — kill the job if it runs over
-    timeout-minutes: 20
+    # Hard cap: LLM generation on a free runner is slow
+    timeout-minutes: 15
 
     env:
-      # tinyllama is ~640 MB and has faster CPU inference than qwen2.5:0.5b
       OLLAMA_MODEL: tinyllama
       OLLAMA_BASE_URL: http://localhost:11434
       AGENT_VERBOSE: "false"
-      MAX_ITERATIONS: "3"
-      QUESTION_TIMEOUT_SECS: "90"
+      QUESTION_TIMEOUT_SECS: "30"
 
     steps:
       - uses: actions/checkout@v4
