@@ -14,7 +14,6 @@ import sys
 import pathlib
 import pytest
 from unittest.mock import MagicMock, patch
-from langchain.agents import AgentExecutor
 
 # Make src/ importable
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "src"))
@@ -130,7 +129,9 @@ class TestBuildAgent:
         with patch("langchain_ollama.ChatOllama", return_value=mock_llm):
             executor = ag.build_agent()
 
-        assert isinstance(executor, AgentExecutor)
+        # Use class name check to avoid isinstance failure caused by the module
+        # being reloaded (two distinct AgentExecutor objects from different imports).
+        assert type(executor).__name__ == "AgentExecutor"
 
     def test_build_agent_registers_two_tools(self, monkeypatch):
         """The executor must have exactly kubectl and docker registered."""
