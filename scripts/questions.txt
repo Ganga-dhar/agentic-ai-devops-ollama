@@ -1,0 +1,17 @@
+# Agent validation questions for CI
+# Format: CATEGORY | question
+# Lines starting with # are comments and are ignored.
+# Categories: docker, kubernetes, reasoning
+
+docker | How many Docker containers are currently running?
+docker | List all Docker images available on this machine with their sizes
+docker | Show all Docker networks and their drivers
+docker | List all Docker volumes
+docker | Show Docker disk usage summary using the df command
+kubernetes | Can you connect to a Kubernetes cluster? Try running kubectl version and report what you find
+kubernetes | List all namespaces in the Kubernetes cluster if available, otherwise explain what you tried
+kubernetes | What happens when you run kubectl get nodes? Report the exact output or error
+reasoning | What is the difference between a Docker container and a Kubernetes Pod?
+reasoning | Explain what a CrashLoopBackOff error means in Kubernetes and the most common causes
+reasoning | When should you use a Kubernetes DaemonSet instead of a Deployment?
+reasoning | What is the difference between a Kubernetes Service of type ClusterIP, NodePort, and LoadBalancer?
