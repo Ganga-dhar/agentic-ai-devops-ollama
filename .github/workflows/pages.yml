@@ -1,0 +1,41 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Trigger only after the CI workflow finishes on main/master
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main", "master"]
+
+  # Allow manual deploy from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  pages: write        # needed to deploy to GitHub Pages
+  id-token: write     # needed by actions/deploy-pages
+
+# Only one Pages deployment runs at a time; cancel in-flight if a new one starts
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    # Only deploy when CI succeeded (or when triggered manually)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Deploy Pages artifact
+        id: deploy
+        uses: actions/deploy-pages@v4
+        # The artifact was already uploaded by the build-report job in ci.yml.
+        # actions/deploy-pages picks it up automatically from the same run
+        # when triggered via workflow_run.
