@@ -1,9 +1,8 @@
 # Agentic AI DevOps Assistant — Ollama + LangChain
 
-[![CI](https://github.com/YOUR_USERNAME/agentic-ai-devops-ollama/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/agentic-ai-devops-ollama/actions/workflows/ci.yml)
-[![Test Reports](https://img.shields.io/badge/Test%20Reports-GitHub%20Pages-blue)](https://YOUR_USERNAME.github.io/agentic-ai-devops-ollama/)
+[![CI](https://github.com/Ganga-dhar/agentic-ai-devops-ollama/actions/workflows/ci.yml/badge.svg)](https://github.com/Ganga-dhar/agentic-ai-devops-ollama/actions/workflows/ci.yml)
+[![Test Reports](https://img.shields.io/badge/Test%20Reports-GitHub%20Pages-blue)](https://Ganga-dhar.github.io/agentic-ai-devops-ollama/)
 
-> Replace `YOUR_USERNAME` with your GitHub username in the two badge URLs above.
 
 A conversational AI agent that answers Kubernetes and Docker questions by calling **real** `kubectl` and `docker` commands as tools. The LLM runs entirely locally via [Ollama](https://ollama.com) — no API keys required.
 
@@ -258,7 +257,7 @@ reasoning  | In one paragraph, what is the difference between a Docker container
 After a successful CI run on `main`, three reports are published to:
 
 ```
-https://YOUR_USERNAME.github.io/agentic-ai-devops-ollama/
+https://Ganga-dhar.github.io/agentic-ai-devops-ollama/
 ```
 
 | Report | Content |
