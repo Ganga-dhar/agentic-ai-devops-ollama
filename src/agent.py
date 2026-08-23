@@ -85,9 +85,12 @@ def build_agent() -> AgentExecutor:
 
     # Pull the standard ReAct prompt from LangChain hub and prepend our
     # system instructions by replacing the default prefix.
+    # create_react_agent requires {tools} and {tool_names} in the prompt so it
+    # can inject tool descriptions at runtime.  {agent_scratchpad} carries the
+    # intermediate reasoning steps.
     prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("human", "{input}"),
+        ("system", SYSTEM_PROMPT + "\n\nTools available:\n{tools}"),
+        ("human", "{input}\n\nTool names: {tool_names}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
 

@@ -115,31 +115,30 @@ def test_agent_verbose_parsing(monkeypatch, value, expected):
 # ---------------------------------------------------------------------------
 
 class TestBuildAgent:
+    def _make_mock_llm(self):
+        mock_llm = MagicMock()
+        # create_react_agent calls .bind on the llm; return self so chaining works
+        mock_llm.bind.return_value = mock_llm
+        mock_llm.bind_tools.return_value = mock_llm
+        return mock_llm
+
     def test_build_agent_returns_executor(self, monkeypatch):
         """build_agent() should return an AgentExecutor without contacting Ollama."""
-        mock_llm = MagicMock()
-        mock_llm.bind_tools = MagicMock(return_value=mock_llm)
+        mock_llm = self._make_mock_llm()
+        ag = _reload_agent_with_env(monkeypatch, {})
 
         with patch("langchain_ollama.ChatOllama", return_value=mock_llm):
-            ag = _reload_agent_with_env(monkeypatch, {})
-            with patch("langchain_ollama.ChatOllama", return_value=mock_llm):
-                with patch("langchain.agents.create_react_agent") as mock_create:
-                    mock_create.return_value = MagicMock()
-                    executor = ag.build_agent()
+            executor = ag.build_agent()
 
         assert isinstance(executor, AgentExecutor)
 
     def test_build_agent_registers_two_tools(self, monkeypatch):
         """The executor must have exactly kubectl and docker registered."""
-        mock_llm = MagicMock()
-        mock_llm.bind_tools = MagicMock(return_value=mock_llm)
+        mock_llm = self._make_mock_llm()
+        ag = _reload_agent_with_env(monkeypatch, {})
 
         with patch("langchain_ollama.ChatOllama", return_value=mock_llm):
-            ag = _reload_agent_with_env(monkeypatch, {})
-            with patch("langchain_ollama.ChatOllama", return_value=mock_llm):
-                with patch("langchain.agents.create_react_agent") as mock_create:
-                    mock_create.return_value = MagicMock()
-                    executor = ag.build_agent()
+            executor = ag.build_agent()
 
         tool_names = {t.name for t in executor.tools}
         assert tool_names == {"kubectl", "docker"}
