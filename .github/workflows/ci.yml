@@ -144,7 +144,7 @@ jobs:
       OLLAMA_MODEL: qwen2.5:3b
       OLLAMA_BASE_URL: http://localhost:11434
       AGENT_VERBOSE: "false"
-      MAX_ITERATIONS: "3"
+      MAX_ITERATIONS: "6"
       QUESTION_TIMEOUT_SECS: "120"
 
     steps:
