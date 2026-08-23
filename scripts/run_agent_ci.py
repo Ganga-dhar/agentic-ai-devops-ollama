@@ -8,10 +8,11 @@ Usage:
         --output    reports/agent-results.json
 
 Environment variables (same as the agent):
-    OLLAMA_BASE_URL   default: http://localhost:11434
-    OLLAMA_MODEL      default: llama3.2
-    AGENT_VERBOSE     default: false  (suppressed in CI for clean output)
-    MAX_ITERATIONS    default: 10
+    OLLAMA_BASE_URL       default: http://localhost:11434
+    OLLAMA_MODEL          default: llama3.2
+    AGENT_VERBOSE         default: false  (suppressed in CI for clean output)
+    MAX_ITERATIONS        default: 10
+    QUESTION_TIMEOUT_SECS default: 90  (per-question hard timeout)
 """
 
 import argparse
@@ -21,6 +22,7 @@ import sys
 import pathlib
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 # Make src/ importable
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "src"))
@@ -28,6 +30,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "src"))
 os.environ.setdefault("AGENT_VERBOSE", "false")   # quieter CI output
 
 from agent import build_agent  # noqa: E402
+
+QUESTION_TIMEOUT = int(os.getenv("QUESTION_TIMEOUT_SECS", "90"))
 
 
 # ---------------------------------------------------------------------------
