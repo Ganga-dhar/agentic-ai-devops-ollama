@@ -12,9 +12,9 @@ ConnectionRefusedError in CI.
 
 import sys
 import pathlib
-import importlib
 import pytest
 from unittest.mock import MagicMock, patch
+from langchain.agents import AgentExecutor
 
 # Make src/ importable
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "src"))

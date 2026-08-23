@@ -13,21 +13,21 @@ import os
 import sys
 import pathlib
 
-# Ensure the src/ directory is on sys.path so sibling modules resolve
-# regardless of the working directory the script is launched from.
+# Ensure src/ is on sys.path so sibling modules (kubectl_tool, docker_tool)
+# resolve regardless of the working directory the script is launched from.
+# This must happen before the local imports below, hence the noqa markers.
 _SRC_DIR = str(pathlib.Path(__file__).parent.resolve())
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # noqa: E402
 
-from langchain_ollama import ChatOllama
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain import hub
+from langchain_ollama import ChatOllama  # noqa: E402
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # noqa: E402
+from langchain.agents import AgentExecutor, create_react_agent  # noqa: E402
 
-from kubectl_tool import kubectl
-from docker_tool import docker
+from kubectl_tool import kubectl  # noqa: E402
+from docker_tool import docker  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -69,6 +69,7 @@ Guidelines:
 # ---------------------------------------------------------------------------
 # Build the agent
 # ---------------------------------------------------------------------------
+
 
 def build_agent() -> AgentExecutor:
     """Construct and return the LangChain ReAct AgentExecutor."""
