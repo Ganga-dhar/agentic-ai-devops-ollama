@@ -60,7 +60,7 @@ def load_questions(path: str) -> list[dict]:
 # Runner
 # ---------------------------------------------------------------------------
 
-def run_questions(questions: list[dict], timeout_secs: int = 120) -> list[dict]:
+def run_questions(questions: list[dict]) -> list[dict]:
     """
     Build one shared AgentExecutor and ask every question.
     Returns a list of result dicts.
@@ -82,11 +82,7 @@ def run_questions(questions: list[dict], timeout_secs: int = 120) -> list[dict]:
         tool_calls: list[str] = []
 
         try:
-            # Capture intermediate steps to record which tools were called
-            exec_with_steps = executor.copy(
-                update={"return_intermediate_steps": True}
-            )
-            result = exec_with_steps.invoke({"input": question})
+            result = executor.invoke({"input": question})
             answer = result.get("output", "").strip()
 
             # Extract tool names from intermediate steps

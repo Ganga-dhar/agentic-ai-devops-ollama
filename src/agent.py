@@ -23,7 +23,7 @@ if _SRC_DIR not in sys.path:
 from dotenv import load_dotenv  # noqa: E402
 
 from langchain_ollama import ChatOllama  # noqa: E402
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # noqa: E402
+from langchain_core.prompts import ChatPromptTemplate  # noqa: E402
 from langchain.agents import AgentExecutor, create_react_agent  # noqa: E402
 
 from kubectl_tool import kubectl  # noqa: E402
@@ -85,14 +85,17 @@ def build_agent() -> AgentExecutor:
 
     # Pull the standard ReAct prompt from LangChain hub and prepend our
     # system instructions by replacing the default prefix.
-    # create_react_agent requires {tools} and {tool_names} in the prompt so it
-    # can inject tool descriptions at runtime.  {agent_scratchpad} carries the
-    # intermediate reasoning steps.
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT + "\n\nTools available:\n{tools}"),
-        ("human", "{input}\n\nTool names: {tool_names}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
+    # create_react_agent requires {tools}, {tool_names}, {input}, and
+    # {agent_scratchpad} as plain string template variables.
+    # MessagesPlaceholder does NOT work here — the ReAct text loop writes
+    # a formatted string into agent_scratchpad, not a list of messages.
+    prompt = ChatPromptTemplate.from_template(
+        SYSTEM_PROMPT
+        + "\n\nTools available:\n{tools}"
+        + "\n\nTool names: {tool_names}"
+        + "\n\n{input}"
+        + "\n\n{agent_scratchpad}"
+    )
 
     agent = create_react_agent(llm, tools, prompt)
 
@@ -105,7 +108,7 @@ def build_agent() -> AgentExecutor:
             "I had trouble parsing my reasoning. "
             "Let me try a different approach."
         ),
-        return_intermediate_steps=False,
+        return_intermediate_steps=True,
     )
 
     return executor
