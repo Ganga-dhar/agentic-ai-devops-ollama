@@ -117,8 +117,6 @@ def test_agent_verbose_parsing(monkeypatch, value, expected):
 class TestBuildAgent:
     def test_build_agent_returns_executor(self, monkeypatch):
         """build_agent() should return an AgentExecutor without contacting Ollama."""
-        from langchain.agents import AgentExecutor
-
         mock_llm = MagicMock()
         mock_llm.bind_tools = MagicMock(return_value=mock_llm)
 
@@ -133,8 +131,6 @@ class TestBuildAgent:
 
     def test_build_agent_registers_two_tools(self, monkeypatch):
         """The executor must have exactly kubectl and docker registered."""
-        from langchain.agents import AgentExecutor
-
         mock_llm = MagicMock()
         mock_llm.bind_tools = MagicMock(return_value=mock_llm)
 
