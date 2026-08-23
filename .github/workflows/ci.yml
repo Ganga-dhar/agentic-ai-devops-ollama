@@ -129,8 +129,8 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   # Job 4: Agent validation — run Ollama locally, fire questions, report
   #
-  # Uses the smallest viable model (qwen2.5:0.5b — ~400 MB) to keep
-  # CI fast. Override via the OLLAMA_MODEL env var if needed.
+  # Uses tinyllama (~640 MB) — fastest CPU inference on GitHub runners.
+  # Each question has a 90s hard timeout; the job itself is capped at 20 min.
   # Runs in parallel with unit/integration tests (only needs lint to pass).
   # ─────────────────────────────────────────────────────────────────────────
   agent-validation:
@@ -139,12 +139,16 @@ jobs:
     needs: lint
     # continue even if this job fails so Pages still gets published
     continue-on-error: true
+    # Hard cap: Ollama on a free runner is slow — kill the job if it runs over
+    timeout-minutes: 20
 
     env:
-      OLLAMA_MODEL: qwen2.5:0.5b
+      # tinyllama is ~640 MB and has faster CPU inference than qwen2.5:0.5b
+      OLLAMA_MODEL: tinyllama
       OLLAMA_BASE_URL: http://localhost:11434
       AGENT_VERBOSE: "false"
-      MAX_ITERATIONS: "6"
+      MAX_ITERATIONS: "3"
+      QUESTION_TIMEOUT_SECS: "90"
 
     steps:
       - uses: actions/checkout@v4

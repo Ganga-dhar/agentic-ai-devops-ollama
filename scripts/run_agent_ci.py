@@ -86,7 +86,18 @@ def run_questions(questions: list[dict]) -> list[dict]:
         tool_calls: list[str] = []
 
         try:
-            result = executor.invoke({"input": question})
+            # Run invoke in a thread so we can enforce a hard wall-clock timeout.
+            # executor.invoke() has no built-in timeout and will hang indefinitely
+            # if Ollama is slow or unresponsive on the CI runner.
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(executor.invoke, {"input": question})
+                try:
+                    result = future.result(timeout=QUESTION_TIMEOUT)
+                except FuturesTimeout:
+                    raise TimeoutError(
+                        f"Question timed out after {QUESTION_TIMEOUT}s"
+                    )
+
             answer = result.get("output", "").strip()
 
             # Extract tool names from intermediate steps
@@ -96,6 +107,12 @@ def run_questions(questions: list[dict]) -> list[dict]:
             if not answer:
                 status = "warn"
                 answer = "(empty response)"
+
+        except TimeoutError as exc:
+            status = "timeout"
+            error = str(exc)
+            answer = ""
+            print(f"    ⏱ TIMEOUT after {QUESTION_TIMEOUT}s")
 
         except Exception as exc:  # noqa: BLE001
             status = "error"
@@ -115,7 +132,7 @@ def run_questions(questions: list[dict]) -> list[dict]:
             "index": i,
             "category": category,
             "question": question,
-            "status": status,       # pass | warn | error
+            "status": status,       # pass | warn | timeout | error
             "answer": answer,
             "tool_calls": tool_calls,
             "elapsed_secs": elapsed,
@@ -131,13 +148,13 @@ def run_questions(questions: list[dict]) -> list[dict]:
 
 def print_summary(results: list[dict]) -> None:
     total = len(results)
-    by_status = {"pass": 0, "warn": 0, "error": 0}
+    by_status: dict[str, int] = {}
     for r in results:
         by_status[r["status"]] = by_status.get(r["status"], 0) + 1
 
+    parts = "  ".join(f"{k}={v}" for k, v in sorted(by_status.items()))
     print("=" * 60)
-    print(f"SUMMARY  total={total}  pass={by_status['pass']}"
-          f"  warn={by_status['warn']}  error={by_status['error']}")
+    print(f"SUMMARY  total={total}  {parts}")
     print("=" * 60)
 
 
@@ -182,9 +199,9 @@ def main() -> None:
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nResults written to {out_path}")
 
-    # Exit non-zero if any question errored
-    error_count = sum(1 for r in results if r["status"] == "error")
-    if error_count:
+    # Exit non-zero if any question errored or timed out
+    bad_count = sum(1 for r in results if r["status"] in {"error", "timeout"})
+    if bad_count:
         sys.exit(1)
 
 

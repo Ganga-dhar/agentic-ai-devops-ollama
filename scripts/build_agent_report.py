@@ -20,9 +20,10 @@ from datetime import datetime, timezone
 # ---------------------------------------------------------------------------
 
 STATUS_BADGE = {
-    "pass":  '<span class="badge pass">PASS</span>',
-    "warn":  '<span class="badge warn">WARN</span>',
-    "error": '<span class="badge error">ERROR</span>',
+    "pass":    '<span class="badge pass">PASS</span>',
+    "warn":    '<span class="badge warn">WARN</span>',
+    "timeout": '<span class="badge timeout">TIMEOUT</span>',
+    "error":   '<span class="badge error">ERROR</span>',
 }
 
 CATEGORY_ICON = {
@@ -210,9 +211,11 @@ def build_html(data: dict) -> str:
       font-size: 0.75rem;
       font-weight: 700;
     }}
-    .badge.pass  {{ background: #dafbe1; color: #1a7f37; }}
-    .badge.warn  {{ background: #fff8c5; color: #9a6700; }}
-    .badge.error {{ background: #ffebe9; color: #cf222e; }}
+    .badge.pass    {{ background: #dafbe1; color: #1a7f37; }}
+    .badge.warn    {{ background: #fff8c5; color: #9a6700; }}
+    .badge.timeout {{ background: #fff0b3; color: #7d4e00; }}
+    .badge.error   {{ background: #ffebe9; color: #cf222e; }}
+    .card.timeout  {{ border-left-color: #7d4e00; }}
 
     .question {{
       padding: 14px 16px;
