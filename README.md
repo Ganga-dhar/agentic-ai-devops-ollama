@@ -214,22 +214,44 @@ push / PR
 
 ### Agent validation in CI
 
-The `agent-validation` job installs Ollama on the runner, pulls `tinyllama`, then runs `scripts/run_agent_ci.py` against `scripts/questions.txt`.
+The `agent-validation` job installs Ollama on the runner, pulls `qwen2.5:3b`, then runs `scripts/run_agent_ci.py` against `scripts/questions.txt` using the **full ReAct agent loop** — the same flow as the interactive agent.
 
-Questions use two modes that avoid the ReAct loop (which requires a large model):
+The LLM receives each question, decides which tool to call (`kubectl` or `docker`), executes the real CLI command, reads the output, and produces a final answer. This validates the complete chain: **Ollama → LangChain ReAct → CLI tools → parsed output → LLM answer**.
 
-| Mode | What it does | Used for |
-|---|---|---|
-| `tool-direct` | Calls `docker.func()` / `kubectl.func()` directly — no LLM | Docker and Kubernetes commands |
-| `llm-only` | Sends question straight to `ChatOllama.invoke()` — no tool loop | Reasoning / knowledge questions |
+#### Why qwen2.5:3b and not a smaller model?
 
-Example `questions.txt` entry:
+The ReAct loop requires the LLM to output a strict text format on every reasoning step:
+
 ```
-docker     | tool-direct | ps -a
-reasoning  | llm-only    | In one paragraph, what is the difference between a Docker container and a Kubernetes Pod?
+Thought: I need to check running containers
+Action: docker
+Action Input: ps -a
 ```
 
-Add or edit questions in `scripts/questions.txt` to extend the validation suite.
+Small models like `tinyllama` (1.1B) cannot follow this format reliably — they output prose instead of the structured `Thought/Action/Action Input` pattern, causing the agent to error on every iteration without ever calling a tool. `qwen2.5:3b` is the practical minimum that handles tool-use correctly.
+
+#### Model capability vs CI speed trade-off
+
+| Model | Size | Follows ReAct format | Practical for CI |
+|---|---|---|---|
+| `tinyllama` | 1.1B | ❌ No | ❌ Timeouts |
+| `qwen2.5:3b` | 3B | ✅ Yes | ✅ ~2–3 min |
+| `llama3.2` | 2B | ✅ Yes | ✅ ~2 min |
+| `mistral:7b` | 7B | ✅ Yes | ⚠️ Slow on free runners |
+
+#### Adding or editing validation questions
+
+Edit `scripts/questions.txt`. Each line is:
+```
+CATEGORY | question text
+```
+
+Keep questions concise and explicit — tell the agent which tool to use if you want to guarantee a tool call:
+```
+docker     | How many Docker containers are currently running? Use the docker tool to check.
+kubernetes | Run kubectl version --client and report what you find.
+reasoning  | In one paragraph, what is the difference between a Docker container and a Kubernetes Pod?
+```
 
 ### GitHub Pages reports
 

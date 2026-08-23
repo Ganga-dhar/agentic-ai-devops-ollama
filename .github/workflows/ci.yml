@@ -127,26 +127,25 @@ jobs:
           retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 4: Agent validation — run Ollama locally, fire questions, report
+  # Job 4: Agent validation — full ReAct loop (LLM + real tools)
   #
-  # Uses tinyllama (~640 MB) — fastest CPU inference on GitHub runners.
-  # Each question has a 90s hard timeout; the job itself is capped at 20 min.
-  # Runs in parallel with unit/integration tests (only needs lint to pass).
+  # Uses qwen2.5:3b — the smallest model that reliably follows the ReAct
+  # text format (Thought / Action / Action Input) needed for tool-use.
+  # tinyllama (1.1B) cannot follow this format and always times out.
   # ─────────────────────────────────────────────────────────────────────────
   agent-validation:
     name: Agent Validation (Ollama)
     runs-on: ubuntu-latest
     needs: lint
-    # continue even if this job fails so Pages still gets published
     continue-on-error: true
-    # Hard cap: LLM generation on a free runner is slow
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     env:
-      OLLAMA_MODEL: tinyllama
+      OLLAMA_MODEL: qwen2.5:3b
       OLLAMA_BASE_URL: http://localhost:11434
       AGENT_VERBOSE: "false"
-      QUESTION_TIMEOUT_SECS: "30"
+      MAX_ITERATIONS: "3"
+      QUESTION_TIMEOUT_SECS: "120"
 
     steps:
       - uses: actions/checkout@v4
@@ -179,7 +178,9 @@ jobs:
 
       # ── Pull the model ───────────────────────────────────────────────────
       - name: Pull model (${{ env.OLLAMA_MODEL }})
-        run: ollama pull ${{ env.OLLAMA_MODEL }}
+        run: |
+          ollama pull ${{ env.OLLAMA_MODEL }}
+          echo "Model pulled successfully"
 
       # ── Smoke-test: verify the model responds ────────────────────────────
       - name: Smoke-test model

@@ -59,6 +59,7 @@ def build_html(data: dict) -> str:
         question = html.escape(r["question"])
         answer = html.escape(r["answer"]) if r["answer"] else ""
         error_msg = html.escape(r["error"]) if r["error"] else ""
+        tools = ", ".join(r.get("tool_calls", [])) or "none"
         mode = html.escape(r.get("mode", "react"))
         elapsed = r.get("elapsed_secs", "?")
         idx = r["index"]
@@ -83,7 +84,7 @@ def build_html(data: dict) -> str:
             <span class="q-num">#{idx}</span>
             <span class="category">{icon} {r['category'].upper()}</span>
             {badge}
-            <span class="meta">mode: {mode} &nbsp;|&nbsp; ⏱ {elapsed}s</span>
+            <span class="meta">🔧 tools: {tools} &nbsp;|&nbsp; ⏱ {elapsed}s</span>
           </div>
           <div class="question">{question}</div>
           {answer_block}
@@ -298,8 +299,6 @@ def build_html(data: dict) -> str:
     <button class="filter-btn" onclick="filter('docker')">🐳 Docker</button>
     <button class="filter-btn" onclick="filter('kubernetes')">☸️ Kubernetes</button>
     <button class="filter-btn" onclick="filter('reasoning')">🧠 Reasoning</button>
-    <button class="filter-btn" onclick="filter('tool-direct')">🔧 tool-direct</button>
-    <button class="filter-btn" onclick="filter('llm-only')">🤖 llm-only</button>
   </div>
 
   <div id="cards">

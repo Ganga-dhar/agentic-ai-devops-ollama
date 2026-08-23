@@ -1,27 +1,9 @@
-# Agent validation questions for CI
-# Format: CATEGORY | MODE | question_or_command
-#
-# MODE values:
-#   tool-direct  — run the CLI command directly (no LLM), validate output
-#   llm-only     — send question straight to LLM.invoke (no tool loop)
-#
-# tool-direct lines: the "question" field is the raw CLI args passed to
-# the tool wrapper (kubectl.func / docker.func) directly.
-#
-# llm-only lines: the "question" field is sent to the LLM as a prompt.
+# Agent validation questions for CI — full ReAct loop (LLM + tools)
+# Format: CATEGORY | question
+# The agent decides which tool to call (kubectl / docker) and when.
+# Categories: docker, kubernetes, reasoning
 
-# ── Docker: direct CLI calls (fast, no LLM needed) ──────────────────────
-docker     | tool-direct | ps -a
-docker     | tool-direct | images
-docker     | tool-direct | network ls
-docker     | tool-direct | volume ls
-docker     | tool-direct | info --format {{.ServerVersion}}
-
-# ── Kubernetes: direct CLI calls (may fail — that's expected in CI) ──────
-kubernetes | tool-direct | version --client
-kubernetes | tool-direct | get nodes
-
-# ── Reasoning: LLM-only (no tool loop, just generation) ─────────────────
-reasoning  | llm-only    | In one paragraph, what is the difference between a Docker container and a Kubernetes Pod?
-reasoning  | llm-only    | In one paragraph, what does CrashLoopBackOff mean in Kubernetes?
-reasoning  | llm-only    | In one paragraph, when should you use a DaemonSet instead of a Deployment?
+docker     | How many Docker containers are currently running? Use the docker tool to check.
+docker     | List all Docker images on this machine with their sizes. Use the docker tool.
+kubernetes | Run kubectl version --client and report what you find.
+reasoning  | In one paragraph, what is the difference between a Docker container and a Kubernetes Pod?

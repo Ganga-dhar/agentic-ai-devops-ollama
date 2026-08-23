@@ -1,14 +1,12 @@
 """
-run_agent_ci.py — validate the agent in CI using two modes:
+run_agent_ci.py — validate the agent in CI using the real ReAct loop.
 
-  tool-direct  Run CLI commands through the tool wrappers directly,
-               no LLM involved. Fast, deterministic, always works.
+The LLM (running via Ollama) decides when to call kubectl or docker,
+calls the tool, reads the output, and produces a final answer — exactly
+the same flow as the interactive agent.
 
-  llm-only     Send a question straight to ChatOllama.invoke(),
-               no ReAct loop. Tests LLM connectivity and generation.
-
-This avoids the ReAct loop entirely in CI, which requires a large,
-instruction-following model to work reliably.
+Requires a model capable of following the ReAct text format, e.g.:
+  qwen2.5:3b, llama3.2, mistral:7b  (NOT tinyllama)
 
 Usage:
     python scripts/run_agent_ci.py \\
@@ -17,9 +15,10 @@ Usage:
 
 Environment variables:
     OLLAMA_BASE_URL       default: http://localhost:11434
-    OLLAMA_MODEL          default: tinyllama
+    OLLAMA_MODEL          default: qwen2.5:3b
     AGENT_VERBOSE         default: false
-    QUESTION_TIMEOUT_SECS default: 30
+    MAX_ITERATIONS        default: 3
+    QUESTION_TIMEOUT_SECS default: 120
 """
 
 import argparse
@@ -36,14 +35,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "src"))
 
 os.environ.setdefault("AGENT_VERBOSE", "false")
 
-from langchain_ollama import ChatOllama                    # noqa: E402
-from langchain_core.messages import HumanMessage           # noqa: E402
-from kubectl_tool import kubectl                            # noqa: E402
-from docker_tool import docker                             # noqa: E402
+from agent import build_agent  # noqa: E402
 
-QUESTION_TIMEOUT = int(os.getenv("QUESTION_TIMEOUT_SECS", "30"))
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama")
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+QUESTION_TIMEOUT = int(os.getenv("QUESTION_TIMEOUT_SECS", "120"))
 
 
 # ---------------------------------------------------------------------------
@@ -53,8 +47,8 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 def load_questions(path: str) -> list[dict]:
     """
     Parse questions.txt.
-    Each non-comment line: CATEGORY | MODE | question_or_command
-    Returns list of dicts: {category, mode, question}
+    Each non-comment line: CATEGORY | question
+    Returns list of dicts: {category, question}
     """
     questions = []
     with open(path, encoding="utf-8") as fh:
@@ -62,125 +56,66 @@ def load_questions(path: str) -> list[dict]:
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
-            parts = [p.strip() for p in line.split("|")]
-            if len(parts) != 3:
+            if "|" not in line:
                 continue
-            category, mode, question = parts
+            category, _, question = line.partition("|")
             questions.append({
-                "category": category.lower(),
-                "mode": mode.lower(),
-                "question": question,
+                "category": category.strip().lower(),
+                "question": question.strip(),
             })
     return questions
 
 
 # ---------------------------------------------------------------------------
-# Tool-direct runner
+# Runner
 # ---------------------------------------------------------------------------
-
-def run_tool_direct(category: str, command: str) -> tuple[str, str]:
-    """
-    Call kubectl.func or docker.func directly — no LLM.
-    Returns (answer, error).
-    """
-    if category == "docker":
-        answer = docker.func(command)
-    elif category == "kubernetes":
-        answer = kubectl.func(command)
-    else:
-        return "", f"Unknown category for tool-direct: {category}"
-    return answer, ""
-
-
-# ---------------------------------------------------------------------------
-# LLM-only runner
-# ---------------------------------------------------------------------------
-
-_llm_instance = None
-
-
-def get_llm() -> ChatOllama:
-    global _llm_instance
-    if _llm_instance is None:
-        _llm_instance = ChatOllama(
-            base_url=OLLAMA_BASE_URL,
-            model=OLLAMA_MODEL,
-            temperature=0,
-            num_predict=256,     # keep answers short for CI speed
-        )
-    return _llm_instance
-
-
-def run_llm_only(question: str) -> tuple[str, str]:
-    """
-    Send a question directly to the LLM — no ReAct loop, no tools.
-    Returns (answer, error).
-    """
-    llm = get_llm()
-    response = llm.invoke([HumanMessage(content=question)])
-    answer = response.content.strip() if hasattr(response, "content") else str(response)
-    return answer, ""
-
-
-# ---------------------------------------------------------------------------
-# Main runner
-# ---------------------------------------------------------------------------
-
-def run_one(category: str, mode: str, question: str) -> tuple[str, str, str]:
-    """
-    Dispatch to the right runner.
-    Returns (status, answer, error): status is pass|warn|timeout|error
-    """
-    if mode == "tool-direct":
-        answer, error = run_tool_direct(category, question)
-    elif mode == "llm-only":
-        answer, error = run_llm_only(question)
-    else:
-        return "error", "", f"Unknown mode: {mode}"
-
-    if error:
-        return "error", "", error
-
-    # A tool returning a "[...] binary not found" or empty string is a warn,
-    # not a hard error — kubectl will fail in CI (no cluster) and that's expected.
-    if not answer:
-        return "warn", "(empty response)", ""
-
-    if any(tag in answer for tag in ("[kubectl] 'kubectl' binary not found",
-                                     "[docker] 'docker' binary not found")):
-        return "warn", answer, ""
-
-    return "pass", answer, ""
-
 
 def run_questions(questions: list[dict]) -> list[dict]:
-    print(f"Model  : {OLLAMA_MODEL}")
+    """
+    Build one shared AgentExecutor and ask every question through the
+    full ReAct loop — LLM reasons, calls tools, reads output, answers.
+    """
+    model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+    print(f"Model  : {model}")
     print(f"Timeout: {QUESTION_TIMEOUT}s per question")
     print(f"Running: {len(questions)} question(s)\n")
+
+    executor = build_agent()
 
     results = []
     for i, q in enumerate(questions, 1):
         category = q["category"]
-        mode = q["mode"]
         question = q["question"]
 
-        label = f"[{i}/{len(questions)}] [{category.upper()}][{mode}]"
-        print(f"{label} {question}")
+        print(f"[{i}/{len(questions)}] [{category.upper()}] {question}")
 
         start = time.monotonic()
         status = "pass"
         answer = ""
         error = ""
+        tool_calls: list[str] = []
 
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(run_one, category, mode, question)
+                future = pool.submit(executor.invoke, {"input": question})
                 try:
-                    status, answer, error = future.result(timeout=QUESTION_TIMEOUT)
+                    result = future.result(timeout=QUESTION_TIMEOUT)
                 except FuturesTimeout:
                     status = "timeout"
-                    error = f"Timed out after {QUESTION_TIMEOUT}s"
+                    error = f"No response within {QUESTION_TIMEOUT}s"
                     print(f"    ⏱  TIMEOUT after {QUESTION_TIMEOUT}s")
+                    result = None
+
+            if result is not None:
+                answer = result.get("output", "").strip()
+                for action, _ in result.get("intermediate_steps", []):
+                    tool_name = getattr(action, "tool", None)
+                    if tool_name and not tool_name.startswith("_"):
+                        tool_calls.append(tool_name)
+
+                if not answer:
+                    status = "warn"
+                    answer = "(empty response)"
 
         except Exception as exc:        # noqa: BLE001
             status = "error"
@@ -189,23 +124,24 @@ def run_questions(questions: list[dict]) -> list[dict]:
 
         elapsed = round(time.monotonic() - start, 2)
         icon = {"pass": "✅", "warn": "⚠️", "timeout": "⏱", "error": "❌"}.get(status, "?")
-        print(f"    {icon} status={status}  time={elapsed}s")
+        tools_str = ", ".join(tool_calls) if tool_calls else "none"
+        print(f"    {icon} status={status}  tools=[{tools_str}]  time={elapsed}s")
         if answer:
             preview = answer[:120].replace("\n", " ")
             print(f"    → {preview}{'…' if len(answer) > 120 else ''}")
-        if error and status != "timeout":
+        if error and status not in ("timeout",):
             print(f"    ✗ {error[:120]}")
         print()
 
         results.append({
             "index": i,
             "category": category,
-            "mode": mode,
             "question": question,
-            "status": status,
+            "status": status,           # pass | warn | timeout | error
             "answer": answer,
-            "error": error,
+            "tool_calls": tool_calls,
             "elapsed_secs": elapsed,
+            "error": error,
         })
 
     return results
@@ -248,8 +184,8 @@ def main() -> None:
     out_path = pathlib.Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "model": OLLAMA_MODEL,
-        "ollama_url": OLLAMA_BASE_URL,
+        "model": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
+        "ollama_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         "total": len(results),
         "pass":    sum(1 for r in results if r["status"] == "pass"),
         "warn":    sum(1 for r in results if r["status"] == "warn"),
@@ -260,7 +196,7 @@ def main() -> None:
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nResults written to {out_path}")
 
-    # Only hard-fail on errors, not timeouts or warns
+    # Timeouts and warns are acceptable — only hard errors fail CI
     if payload["error"] > 0:
         sys.exit(1)
 
